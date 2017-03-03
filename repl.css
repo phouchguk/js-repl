@@ -23,3 +23,11 @@ div#repl textarea {
     resize: none;
     width: 90%;
 }
+
+div#repl .lisp-nr {
+    color: blue;
+}
+
+div#repl .lisp-str {
+    color: red;
+}

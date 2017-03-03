@@ -1,3 +1,5 @@
+/* globals console, lisp */
+
 (function () {
     var prompt, ta;
 
@@ -12,19 +14,19 @@
 
             // if the user pressed enter, try and read
             try {
-                result = lisp.read(ta.value);
+                result = lisp.html(lisp.eval(lisp.read(lisp.makeStream(ta.value))));
 
                 prompt.insertAdjacentHTML("beforebegin",
                                           "<span>&gt;&nbsp;" +
+                                          ta.value +
+                                          "</span><br>" +
                                           result +
-                                          "</span><br><span>" +
-                                          result +
-                                          "</span><br>")
+                                          "<br>");
 
                 // presume successful read
                 ta.value = "";
             } catch (err) {
-                // do nothing
+                console.error(err);
             }
         }
     });

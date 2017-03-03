@@ -2,8 +2,24 @@ body {
     background-color: black;
 }
 
-div#repl {
+div#repl, div#repl textarea {
     color: white;
     font-family: lucida console;
-    font-size: 87.5%;
+    font-size: 9pt;
+    line-height: 14pt;
+}
+
+div#repl span#prompt {
+    float: left;
+}
+
+div#repl textarea {
+    background-color: black;
+    border: none;
+    float: left;
+    margin: 0;
+    outline: none;
+    padding: 0;
+    resize: none;
+    width: 90%;
 }

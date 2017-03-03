@@ -1,0 +1,9 @@
+body {
+    background-color: black;
+}
+
+div#repl {
+    color: white;
+    font-family: lucida console;
+    font-size: 87.5%;
+}

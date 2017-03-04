@@ -1,15 +1,32 @@
 (function (exports) {
-    var allocObject, available, bufferMax, eatExpectedString, eatWhitespace, getc, init, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isSpace, isString, isTrue, lispF, lispT, makeCharacter, makeFixnum, makeString, peek, peekExpectedDelimiter, readCharacter, theEmptyList, ungetc;
+    var allocObject, bufferMax, car, cdr, cons, eatExpectedString, eatWhitespace, getc, htmlPair, init, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isPair, isSpace, isString, isTheEmptyList, isTrue, lispF, lispT, makeCharacter, makeFixnum, makeSpan, makeString, peek, peekExpectedDelimiter, readCharacter, readPair, setCar, setCdr, theEmptyList, ungetc, writePair;
 
     allocObject = function () {
-        if (available.length === 0) {
-            throw("out of memory");
-        }
-
-        return available.pop();
+        return { type: "BLANK" };
     };
 
     bufferMax = 1000;
+
+    car = function (pair) {
+        return pair.pair.car;
+    };
+
+    cdr = function (pair) {
+        return pair.pair.cdr;
+    };
+
+    cons = function (car, cdr) {
+        var obj;
+
+        obj = allocObject();
+        obj.type = "PAIR";
+        obj.pair = {
+            car: car,
+            cdr: cdr
+        };
+
+        return obj;
+    };
 
     eatExpectedString = function (s, str) {
         var c, i;
@@ -54,15 +71,26 @@
         return c;
     };
 
-    init = function () {
-        var i;
+    htmlPair = function (pair) {
+        var carObj, cdrObj, temp;
 
-        available = [];
+        carObj = car(pair);
+        cdrObj = cdr(pair);
 
-        for (i = 0; i < 10; i++) {
-            available.push({ type: "BLANK" });
+        temp = exports.html(carObj);
+
+        if (cdrObj.type === "PAIR") {
+            return temp + " " + htmlPair(cdrObj);
         }
 
+        if (cdrObj.type === "THE_EMPTY_LIST") {
+            return temp;
+        }
+
+        return temp + " . " + exports.html(cdrObj);
+    };
+
+    init = function () {
         lispF = allocObject();
         lispF.type = "BOOLEAN";
         lispF.boolean = {
@@ -104,12 +132,20 @@
         return obj === lispF;
     };
 
+    isPair = function (obj) {
+        return obj.type === "PAIR";
+    };
+
     isSpace = function (c) {
         return c === " " || c === "\n" || c === "\t";
     };
 
     isString = function (obj) {
         return obj.type === "STRING";
+    };
+
+    isTheEmptyList = function (obj) {
+        return obj.type === "THE_EMPTY_LIST";
     };
 
     isTrue = function (obj) {
@@ -138,6 +174,10 @@
         };
 
         return obj;
+    };
+
+    makeSpan = function (cls, text) {
+        return "<span class=\"lisp-" + cls + "\">" + text + "</span>";
     };
 
     makeString = function (str) {
@@ -200,12 +240,81 @@
         return makeCharacter(c);
     };
 
+    readPair = function (s) {
+        var c, carObj, cdrObj;
+
+        eatWhitespace(s);
+        c = getc(s);
+
+        if (c === ")") {
+            // read the empty list
+            return theEmptyList;
+        }
+
+        ungetc(s);
+        carObj = exports.read(s);
+        eatWhitespace(s);
+        c = getc(s);
+
+        if (c === ".") {
+            // read improper list
+            c = peek(s);
+
+            if (!isDelimiter(c)) {
+                throw("dot not followed by delimiter");
+            }
+
+            cdrObj = exports.read(s);
+            eatWhitespace(s);
+            c = getc(s);
+
+            if (c !== ")") {
+                throw("where was the trailing paren?");
+            }
+
+            return cons(carObj, cdrObj);
+        }
+
+        // read list
+        ungetc(s);
+        cdrObj = readPair(s);
+
+        return cons(carObj, cdrObj);
+    };
+
+    setCar = function (obj, value) {
+        obj.pair.car = value;
+    };
+
+    setCdr = function (obj, value) {
+        obj.pair.cdr = value;
+    };
+
     ungetc = function (s) {
         if (s.cursor === 0) {
             return;
         }
 
         s.cursor -= 1;
+    };
+
+    writePair = function (pair) {
+        var carObj, cdrObj, temp;
+
+        carObj = car(pair);
+        cdrObj = cdr(pair);
+
+        temp = exports.write(carObj);
+
+        if (cdrObj.type === "PAIR") {
+            return temp + " " + writePair(cdrObj);
+        }
+
+        if (cdrObj.type === "THE_EMPTY_LIST") {
+            return temp;
+        }
+
+        return temp + " . " + exports.write(cdrObj);
     };
 
     exports.eval = function (exp) {
@@ -215,39 +324,43 @@
     exports.html = function (obj) {
         var cls, text;
 
-        text = exports.write(obj);
+        if (obj.type === "PAIR") {
+            return makeSpan("paren", "(") + htmlPair(obj) + makeSpan("paren", ")");
+        } else {
+            text = exports.write(obj);
 
-        switch (obj.type) {
-        case "BOOLEAN":
-            cls = "bool";
+            switch (obj.type) {
+            case "BOOLEAN":
+                cls = "bool";
 
-            break;
+                break;
 
-        case "CHARACTER":
-            cls = "char";
+            case "CHARACTER":
+                cls = "char";
 
-            break;
+                break;
 
-        case "FIXNUM":
-            cls = "nr";
+            case "FIXNUM":
+                cls = "nr";
 
-            break;
+                break;
 
-        case "STRING":
-            cls = "str";
+            case "STRING":
+                cls = "str";
 
-            break;
+                break;
 
-        case "THE_EMPTY_LIST":
-            cls = "paren";
+            case "THE_EMPTY_LIST":
+                cls = "paren";
 
-            break;
+                break;
 
-        default:
-            throw("cannot write unknown type");
+            default:
+                throw("cannot write unknown type");
+            }
+
+            return makeSpan(cls, text);
         }
-
-        return "<span class=\"lisp-" + cls + "\">" + text + "</span>";
     };
 
     exports.makeStream = function (s) {
@@ -327,14 +440,7 @@
         }
 
         if (c === "(") {
-            eatWhitespace(s);
-            c = getc(s);
-
-            if (c === ")") {
-                return theEmptyList;
-            }
-
-            throw("unexpected character '" + c + "'");
+            return readPair(s);
         }
 
         throw("bad input. Unexpected '" + c + "'");
@@ -367,6 +473,9 @@
 
         case "FIXNUM":
             return obj.fixnum.value + "";
+
+        case "PAIR":
+            return "(" + writePair(obj) + ")";
 
         case "STRING":
             token = "";

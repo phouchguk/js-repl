@@ -28,6 +28,10 @@ div#repl .lisp-bool {
     color: orange;
 }
 
+div#repl .lisp-char {
+    color: green;
+}
+
 div#repl .lisp-nr {
     color: blue;
 }

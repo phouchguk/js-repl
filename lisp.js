@@ -1,5 +1,5 @@
 (function (exports) {
-    var allocObject, available, eatWhitespace, getc, init, isBoolean, isDelimiter, isDigit, isFalse, isSpace, isTrue, lispF, lispT, makeFixnum, peek, ungetc;
+    var allocObject, available, eatExpectedString, eatWhitespace, getc, init, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isSpace, isTrue, lispF, lispT, makeCharacter, makeFixnum, peek, peekExpectedDelimiter, readCharacter, ungetc;
 
     allocObject = function () {
         if (available.length === 0) {
@@ -7,6 +7,18 @@
         }
 
         return available.pop();
+    };
+
+    eatExpectedString = function (s, str) {
+        var c, i;
+
+        for (i = 0; i < str.length; i++) {
+            c = getc(s);
+
+            if (c !== str.substring(i, i + 1)) {
+                throw("unexpected character '" + c + "'");
+            }
+        }
     };
 
     eatWhitespace = function (s) {
@@ -66,6 +78,10 @@
         return obj.type === "BOOLEAN";
     };
 
+    isCharacter = function (obj) {
+        return obj.type === "CHARACTER";
+    };
+
     isDelimiter = function (c) {
         return isSpace(c) || c === null ||
             c === "(" || c === ")" ||
@@ -91,6 +107,18 @@
         return !isFalse(obj);
     };
 
+    makeCharacter = function (c) {
+        var obj;
+
+        obj = allocObject();
+        obj.type = "CHARACTER";
+        obj.character = {
+            value: c
+        };
+
+        return obj;
+    };
+
     makeFixnum = function (n) {
         var obj;
 
@@ -109,6 +137,46 @@
         }
 
         return s.value.substring(s.cursor, s.cursor + 1);
+    };
+
+    peekExpectedDelimiter = function (s) {
+        if (!isDelimiter(peek(s))) {
+            throw("character not followed by delimiter");
+        }
+    };
+
+    readCharacter = function (s) {
+        var c;
+
+        c = getc(s);
+
+        switch (c) {
+            case null:
+            throw("incompete character literal");
+
+            case "s":
+            if (peek(s) === "p") {
+                eatExpectedString(s, "pace");
+                peekExpectedDelimiter(s);
+
+                return makeCharacter(" ");
+            }
+
+            break;
+
+            case "n":
+            if (peek(s) === "e") {
+                eatExpectedString(s, "ewline");
+                peekExpectedDelimiter(s);
+
+                return makeCharacter("\n");
+            }
+
+            break;
+        }
+
+        peekExpectedDelimiter(s);
+        return makeCharacter(c);
     };
 
     ungetc = function (s) {
@@ -133,10 +201,17 @@
             cls = "bool";
 
             break;
+
+        case "CHARACTER":
+            cls = "char";
+
+            break;
+
         case "FIXNUM":
             cls = "nr";
 
             break;
+
         default:
             throw("cannot write unknown type");
         }
@@ -168,8 +243,11 @@
                 case "f":
                 return lispF;
 
+                case "\\":
+                return readCharacter(s);
+
                 default:
-                throw("unknown boolean literal");
+                throw("unknown boolean or character literal");
             }
         }
 
@@ -193,11 +271,33 @@
     };
 
     exports.write = function (obj) {
+        var c, token;
+
         switch (obj.type) {
         case "BOOLEAN":
             return "#" + (isFalse(obj) ? "f" : "t");
+
+        case "CHARACTER":
+            c = obj.character.value;
+
+            switch (c) {
+                case "\n":
+                token = "newline";
+                break;
+
+                case " ":
+                token = "space";
+                break;
+
+                default:
+                token = c;
+            }
+
+            return "#\\" + token;
+
         case "FIXNUM":
             return obj.fixnum.value + "";
+
         default:
             throw("cannot write unknown type");
         }

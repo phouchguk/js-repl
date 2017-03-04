@@ -1,5 +1,5 @@
 (function (exports) {
-    var allocObject, available, eatExpectedString, eatWhitespace, getc, init, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isSpace, isTrue, lispF, lispT, makeCharacter, makeFixnum, peek, peekExpectedDelimiter, readCharacter, ungetc;
+    var allocObject, available, bufferMax, eatExpectedString, eatWhitespace, getc, init, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isSpace, isString, isTrue, lispF, lispT, makeCharacter, makeFixnum, makeString, peek, peekExpectedDelimiter, readCharacter, ungetc;
 
     allocObject = function () {
         if (available.length === 0) {
@@ -8,6 +8,8 @@
 
         return available.pop();
     };
+
+    bufferMax = 1000;
 
     eatExpectedString = function (s, str) {
         var c, i;
@@ -103,6 +105,10 @@
         return c === " " || c === "\n" || c === "\t";
     };
 
+    isString = function (obj) {
+        return obj.type === "STRING";
+    };
+
     isTrue = function (obj) {
         return !isFalse(obj);
     };
@@ -126,6 +132,18 @@
         obj.type = "FIXNUM";
         obj.fixnum = {
             value: n
+        };
+
+        return obj;
+    };
+
+    makeString = function (str) {
+        var obj;
+
+        obj = allocObject();
+        obj.type = "STRING";
+        obj.string = {
+            value: str
         };
 
         return obj;
@@ -212,6 +230,11 @@
 
             break;
 
+        case "STRING":
+            cls = "str";
+
+            break;
+
         default:
             throw("cannot write unknown type");
         }
@@ -227,7 +250,7 @@
     };
 
     exports.read = function (s) {
-        var c, token;
+        var c, i, token;
 
         eatWhitespace(s);
 
@@ -267,11 +290,39 @@
             throw("number not followed by delimiter");
         }
 
+        if (c === "\"") {
+            i = 0;
+            token = "";
+
+            while ((c = getc(s)) !== "\"") {
+                if (c === "\\") {
+                    c = getc(s);
+
+                    if (c === "n") {
+                        c = "\n";
+                    }
+                }
+
+                if (c === null) {
+                    throw("non-terminated string literal");
+                }
+
+                if (i < bufferMax) {
+                    token = token + c;
+                    i = i + 1;
+                } else {
+                    throw("string too long. Maximum length is " + bufferMax);
+                }
+            }
+
+            return makeString(token);
+        }
+
         throw("bad input. Unexpected '" + c + "'");
     };
 
     exports.write = function (obj) {
-        var c, token;
+        var c, i, len, str, token;
 
         switch (obj.type) {
         case "BOOLEAN":
@@ -297,6 +348,34 @@
 
         case "FIXNUM":
             return obj.fixnum.value + "";
+
+        case "STRING":
+            token = "";
+            str = obj.string.value;
+            len = str.length;
+
+            for (i = 0; i < len; i++) {
+                c = str.substring(i, i + 1);
+
+                switch (c) {
+                    case "\n":
+                    token = token + "\\n";
+                    break;
+
+                    case "\\":
+                    token = token + "\\\\";
+                    break;
+
+                    case "\"":
+                    token = token + "\\\"";
+                    break;
+
+                    default:
+                    token = token + c;
+                }
+            }
+
+            return "\"" + token + "\"";
 
         default:
             throw("cannot write unknown type");

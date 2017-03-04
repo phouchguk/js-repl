@@ -1,5 +1,5 @@
 (function (exports) {
-    var allocObject, available, bufferMax, eatExpectedString, eatWhitespace, getc, init, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isSpace, isString, isTrue, lispF, lispT, makeCharacter, makeFixnum, makeString, peek, peekExpectedDelimiter, readCharacter, ungetc;
+    var allocObject, available, bufferMax, eatExpectedString, eatWhitespace, getc, init, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isSpace, isString, isTrue, lispF, lispT, makeCharacter, makeFixnum, makeString, peek, peekExpectedDelimiter, readCharacter, theEmptyList, ungetc;
 
     allocObject = function () {
         if (available.length === 0) {
@@ -74,6 +74,9 @@
         lispT.boolean = {
             value: 1
         };
+
+        theEmptyList = allocObject();
+        theEmptyList.type = "THE_EMPTY_LIST";
     };
 
     isBoolean = function (obj) {
@@ -235,6 +238,11 @@
 
             break;
 
+        case "THE_EMPTY_LIST":
+            cls = "paren";
+
+            break;
+
         default:
             throw("cannot write unknown type");
         }
@@ -318,6 +326,17 @@
             return makeString(token);
         }
 
+        if (c === "(") {
+            eatWhitespace(s);
+            c = getc(s);
+
+            if (c === ")") {
+                return theEmptyList;
+            }
+
+            throw("unexpected character '" + c + "'");
+        }
+
         throw("bad input. Unexpected '" + c + "'");
     };
 
@@ -376,6 +395,9 @@
             }
 
             return "\"" + token + "\"";
+
+        case "THE_EMPTY_LIST":
+            return "()";
 
         default:
             throw("cannot write unknown type");

@@ -36,6 +36,10 @@ div#repl .lisp-nr {
     color: blue;
 }
 
+div#repl .lisp-paren {
+    color: grey;
+}
+
 div#repl .lisp-str {
     color: red;
 }

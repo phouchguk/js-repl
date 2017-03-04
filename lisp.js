@@ -1,5 +1,5 @@
 (function (exports) {
-    var allocObject, bufferMax, car, cdr, cons, eatExpectedString, eatWhitespace, getc, htmlPair, init, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isPair, isSpace, isString, isTheEmptyList, isTrue, lispF, lispT, makeCharacter, makeFixnum, makeSpan, makeString, peek, peekExpectedDelimiter, readCharacter, readPair, setCar, setCdr, theEmptyList, ungetc, writePair;
+    var allocObject, bufferMax, car, cdr, cons, eatExpectedString, eatWhitespace, getc, htmlPair, init, isAlpha, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isInitial, isPair, isSpace, isString, isSymbol, isTheEmptyList, isTrue, lispF, lispT, makeCharacter, makeFixnum, makeSpan, makeString, makeSymbol, peek, peekExpectedDelimiter, readCharacter, readPair, setCar, setCdr, symbolTable, theEmptyList, ungetc, writePair;
 
     allocObject = function () {
         return { type: "BLANK" };
@@ -105,6 +105,20 @@
 
         theEmptyList = allocObject();
         theEmptyList.type = "THE_EMPTY_LIST";
+
+        symbolTable = {};
+    };
+
+    isAlpha = function (c) {
+        var code;
+
+        if (c === null) {
+            return false;
+        }
+
+        code = c.charCodeAt(0);
+
+        return (code > 96 && code < 123) || (code > 64 && code < 91);
     };
 
     isBoolean = function (obj) {
@@ -132,6 +146,11 @@
         return obj === lispF;
     };
 
+    isInitial = function (c) {
+        return isAlpha(c) || c === "*" || c === "/" || c === ">" ||
+            c === "<" || c === "=" || c === "?" || c === "!";
+    };
+
     isPair = function (obj) {
         return obj.type === "PAIR";
     };
@@ -142,6 +161,10 @@
 
     isString = function (obj) {
         return obj.type === "STRING";
+    };
+
+    isSymbol = function (obj) {
+        return obj.type === "SYMBOL";
     };
 
     isTheEmptyList = function (obj) {
@@ -188,6 +211,24 @@
         obj.string = {
             value: str
         };
+
+        return obj;
+    };
+
+    makeSymbol = function (value) {
+        var obj;
+
+        if (symbolTable[value]) {
+            return symbolTable[value];
+        }
+
+        obj = allocObject();
+        obj.type = "SYMBOL";
+        obj.symbol = {
+            value: value
+        };
+
+        symbolTable[value] = obj;
 
         return obj;
     };
@@ -350,6 +391,11 @@
 
                 break;
 
+            case "SYMBOL":
+                cls = "sym";
+
+                break;
+
             case "THE_EMPTY_LIST":
                 cls = "paren";
 
@@ -409,6 +455,29 @@
             }
 
             throw("number not followed by delimiter");
+        }
+
+        if (isInitial(c) || ((c === "+" || c === "-") && isDelimiter(peek(s)))) {
+            i = 0;
+            token = "";
+
+            while (isInitial(c) || isDigit(c) || c === "+" || c === "-") {
+                if (i < bufferMax) {
+                    token = token + c;
+                    i = i + 1;
+                } else {
+                    throw("symbol too long. Maximum length is " + bufferMax);
+                }
+
+                c = getc(s);
+            }
+
+            if (isDelimiter(c)) {
+                ungetc(s);
+                return makeSymbol(token);
+            }
+
+            throw("symbol not followed by delimiter. Found '" + c + "'");
         }
 
         if (c === "\"") {
@@ -504,6 +573,9 @@
             }
 
             return "\"" + token + "\"";
+
+        case "SYMBOL":
+            return obj.symbol.value;
 
         case "THE_EMPTY_LIST":
             return "()";

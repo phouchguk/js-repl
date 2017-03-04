@@ -1,5 +1,5 @@
 (function (exports) {
-    var allocObject, available, eatWhitespace, getc, init, isDelimiter, isDigit, isSpace, makeFixnum, peek, ungetc;
+    var allocObject, available, eatWhitespace, getc, init, isBoolean, isDelimiter, isDigit, isFalse, isSpace, isTrue, lispF, lispT, makeFixnum, peek, ungetc;
 
     allocObject = function () {
         if (available.length === 0) {
@@ -48,6 +48,22 @@
         for (i = 0; i < 10; i++) {
             available.push({ type: "BLANK" });
         }
+
+        lispF = allocObject();
+        lispF.type = "BOOLEAN";
+        lispF.boolean = {
+            value: 0
+        };
+
+        lispT = allocObject();
+        lispT.type = "BOOLEAN";
+        lispT.boolean = {
+            value: 1
+        };
+    };
+
+    isBoolean = function (obj) {
+        return obj.type === "BOOLEAN";
     };
 
     isDelimiter = function (c) {
@@ -63,8 +79,16 @@
             c === "9";
     };
 
+    isFalse = function (obj) {
+        return obj === lispF;
+    };
+
     isSpace = function (c) {
         return c === " " || c === "\n" || c === "\t";
+    };
+
+    isTrue = function (obj) {
+        return !isFalse(obj);
     };
 
     makeFixnum = function (n) {
@@ -102,10 +126,15 @@
     exports.html = function (obj) {
         var cls, text;
 
+        text = exports.write(obj);
+
         switch (obj.type) {
+        case "BOOLEAN":
+            cls = "bool";
+
+            break;
         case "FIXNUM":
             cls = "nr";
-            text = obj.fixnum.value + "";
 
             break;
         default:
@@ -129,6 +158,21 @@
 
         c = getc(s);
 
+        if (c === "#") {
+            c = getc(s);
+
+            switch (c) {
+                case "t":
+                return lispT;
+
+                case "f":
+                return lispF;
+
+                default:
+                throw("unknown boolean literal");
+            }
+        }
+
         if (isDigit(c) || c === "-" && isDigit(peek(s))) {
             token = c;
 
@@ -150,6 +194,8 @@
 
     exports.write = function (obj) {
         switch (obj.type) {
+        case "BOOLEAN":
+            return "#" + (isFalse(obj) ? "f" : "t");
         case "FIXNUM":
             return obj.fixnum.value + "";
         default:

@@ -4,7 +4,7 @@ body {
 
 div#repl, div#repl textarea {
     color: white;
-    font-family: lucida console;
+    font-family: lucida console, courier new;
     font-size: 9pt;
     line-height: 14pt;
 }
@@ -22,6 +22,10 @@ div#repl textarea {
     padding: 0;
     resize: none;
     width: 90%;
+}
+
+div#repl .lisp-bool {
+    color: orange;
 }
 
 div#repl .lisp-nr {

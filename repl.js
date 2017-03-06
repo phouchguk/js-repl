@@ -14,7 +14,7 @@
 
             // if the user pressed enter, try and read
             try {
-                result = lisp.html(lisp.eval(lisp.read(lisp.makeStream(ta.value))));
+                result = lisp.html(lisp.eval(lisp.read(lisp.makeStream(ta.value)), lisp.theGlobalEnvironment));
 
                 prompt.insertAdjacentHTML("beforebegin",
                                           "<span>&gt;&nbsp;" +

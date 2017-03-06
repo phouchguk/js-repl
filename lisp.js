@@ -1,8 +1,21 @@
 (function (exports) {
-    var allocObject, bufferMax, car, cdr, cons, eatExpectedString, eatWhitespace, getc, htmlPair, init, isAlpha, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isFixnum, isInitial, isPair, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, lispF, lispT, makeCharacter, makeFixnum, makeSpan, makeString, makeSymbol, peek, peekExpectedDelimiter, quoteSymbol, readCharacter, readPair, setCar, setCdr, symbolTable, textOfQuotation, theEmptyList, ungetc, writePair;
+    var addBindingToFrame, allocObject, assignmentValue, assignmentVariable, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstFrame, frameValues, frameVariables, getc, htmlPair, init, isAlpha, isAssignment, isBoolean, isCharacter, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isInitial, isPair, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lispF, lispT, lookupVariableValue, makeCharacter, makeFixnum, makeFrame, makeSpan, makeString, makeSymbol, okSymbol, peek, peekExpectedDelimiter, quoteSymbol, readCharacter, readPair, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
+
+    addBindingToFrame = function (variable, value, frame) {
+        setCar(frame, cons(variable, car(frame)));
+        setCdr(frame, cons(value, cdr(frame)));
+    };
 
     allocObject = function () {
         return { type: "BLANK" };
+    };
+
+    assignmentValue = function (exp) {
+        return car(cdr(cdr(exp)));
+    };
+
+    assignmentVariable = function (exp) {
+        return car(cdr(exp));
     };
 
     bufferMax = 1000;
@@ -26,6 +39,35 @@
         };
 
         return obj;
+    };
+
+    defineVariable = function (variable, val, env) {
+        var frame, vars, vals;
+
+        frame = firstFrame(env);
+        vars = frameVariables(frame);
+        vals = frameValues(frame);
+
+        while (!isTheEmptyList(vars)) {
+            if (variable === car(vars)) {
+                setCar(vals, val);
+
+                return;
+            }
+
+            vars = cdr(vars);
+            vals = cdr(vals);
+        }
+
+        addBindingToFrame(variable, val, frame);
+    };
+
+    definitionValue = function (exp) {
+        return car(cdr(cdr(exp)));
+    };
+
+    definitionVariable = function (exp) {
+        return car(cdr(exp));
     };
 
     eatExpectedString = function (s, str) {
@@ -57,6 +99,42 @@
 
             break;
         }
+    };
+
+    enclosingEnvironment = function (env) {
+        return cdr(env);
+    };
+
+    evalAssignment = function (exp, env) {
+        setVariableValue(assignmentVariable(exp),
+                         exports.eval(assignmentValue(exp), env),
+                         env);
+
+        return okSymbol;
+    };
+
+    evalDefinition = function (exp, env) {
+        defineVariable(definitionVariable(exp),
+                       exports.eval(definitionValue(exp), env),
+                       env);
+
+        return okSymbol;
+    };
+
+    extendEnvironment = function (variables, values, baseEnv) {
+        return cons(makeFrame(variables, values), baseEnv);
+    };
+
+    firstFrame = function (env) {
+        return car(env);
+    };
+
+    frameValues = function (frame) {
+        return cdr(frame);
+    };
+
+    frameVariables = function (frame) {
+        return car(frame);
     };
 
     getc = function (s) {
@@ -108,7 +186,13 @@
 
         symbolTable = {};
 
+        defineSymbol = makeSymbol("define");
+        okSymbol = makeSymbol("ok");
         quoteSymbol = makeSymbol("quote");
+        setSymbol = makeSymbol("set!");
+
+        theEmptyEnvironment = theEmptyList;
+        exports.theGlobalEnvironment = setupEnvironment();
     };
 
     isAlpha = function (c) {
@@ -123,12 +207,20 @@
         return (code > 96 && code < 123) || (code > 64 && code < 91);
     };
 
+    isAssignment = function (exp) {
+        return isTaggedList(exp, setSymbol);
+    };
+
     isBoolean = function (obj) {
         return obj.type === "BOOLEAN";
     };
 
     isCharacter = function (obj) {
         return obj.type === "CHARACTER";
+    };
+
+    isDefinition = function (exp) {
+        return isTaggedList(exp, defineSymbol);
     };
 
     isDelimiter = function (c) {
@@ -177,7 +269,9 @@
     };
 
     isSpecial = function (sym) {
-        return sym === quoteSymbol;
+        return sym === defineSymbol ||
+            sym === quoteSymbol ||
+            sym === setSymbol;
     };
 
     isString = function (obj) {
@@ -207,6 +301,31 @@
         return !isFalse(obj);
     };
 
+    isVariable = isSymbol;
+
+    lookupVariableValue = function (variable, env) {
+        var frame, vars, vals;
+
+        while (!isTheEmptyList(env)) {
+            frame = firstFrame(env);
+            vars = frameVariables(frame);
+            vals = frameValues(frame);
+
+            while (!isTheEmptyList(vars)) {
+                if (variable === car(vars)) {
+                    return car(vals);
+                }
+
+                vars = cdr(vars);
+                vals = cdr(vals);
+            }
+
+            env = enclosingEnvironment(env);
+        }
+
+        throw("unbound variable");
+    };
+
     makeCharacter = function (c) {
         var obj;
 
@@ -229,6 +348,10 @@
         };
 
         return obj;
+    };
+
+    makeFrame = function (variables, values) {
+        return cons(variables, values);
     };
 
     makeSpan = function (cls, text) {
@@ -363,6 +486,37 @@
         obj.pair.cdr = value;
     };
 
+    setupEnvironment = function () {
+        return extendEnvironment(theEmptyList,
+                                 theEmptyList,
+                                 theEmptyEnvironment);
+    };
+
+    setVariableValue = function (variable, val, env) {
+        var frame, vars, vals;
+
+        while (!isTheEmptyList(env)) {
+            frame = firstFrame(env);
+            vars = frameVariables(frame);
+            vals = frameValues(frame);
+
+            while (!isTheEmptyList(vars)) {
+                if (variable === car(vars)) {
+                    setCar(vals, val);
+
+                    return;
+                }
+
+                vars = cdr(vars);
+                vals = cdr(vals);
+            }
+
+            env = enclosingEnvironment(env);
+        }
+
+        throw("unbound variable");
+    };
+
     textOfQuotation = function (exp) {
         return car(cdr(exp));
     };
@@ -394,13 +548,25 @@
         return temp + " . " + exports.write(cdrObj);
     };
 
-    exports.eval = function (exp) {
+    exports.eval = function (exp, env) {
         if (isSelfEvaluating(exp)) {
             return exp;
         }
 
+        if (isVariable(exp)) {
+            return lookupVariableValue(exp, env);
+        }
+
         if (isQuoted(exp)) {
             return textOfQuotation(exp);
+        }
+
+        if (isAssignment(exp)) {
+            return evalAssignment(exp, env);
+        }
+
+        if (isDefinition(exp)) {
+            return evalDefinition(exp, env);
         }
 
         throw("cannot eval unknown expression type");

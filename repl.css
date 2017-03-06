@@ -40,6 +40,10 @@ div#repl .lisp-paren {
     color: grey;
 }
 
+div#repl .lisp-special {
+    color: purple;
+}
+
 div#repl .lisp-str {
     color: red;
 }

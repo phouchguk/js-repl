@@ -1,5 +1,5 @@
 (function (exports) {
-    var allocObject, bufferMax, car, cdr, cons, eatExpectedString, eatWhitespace, getc, htmlPair, init, isAlpha, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isInitial, isPair, isSpace, isString, isSymbol, isTheEmptyList, isTrue, lispF, lispT, makeCharacter, makeFixnum, makeSpan, makeString, makeSymbol, peek, peekExpectedDelimiter, readCharacter, readPair, setCar, setCdr, symbolTable, theEmptyList, ungetc, writePair;
+    var allocObject, bufferMax, car, cdr, cons, eatExpectedString, eatWhitespace, getc, htmlPair, init, isAlpha, isBoolean, isCharacter, isDelimiter, isDigit, isFalse, isFixnum, isInitial, isPair, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, lispF, lispT, makeCharacter, makeFixnum, makeSpan, makeString, makeSymbol, peek, peekExpectedDelimiter, quoteSymbol, readCharacter, readPair, setCar, setCdr, symbolTable, textOfQuotation, theEmptyList, ungetc, writePair;
 
     allocObject = function () {
         return { type: "BLANK" };
@@ -107,6 +107,8 @@
         theEmptyList.type = "THE_EMPTY_LIST";
 
         symbolTable = {};
+
+        quoteSymbol = makeSymbol("quote");
     };
 
     isAlpha = function (c) {
@@ -146,6 +148,10 @@
         return obj === lispF;
     };
 
+    isFixnum = function (obj) {
+        return obj.type === "FIXNUM";
+    };
+
     isInitial = function (c) {
         return isAlpha(c) || c === "*" || c === "/" || c === ">" ||
             c === "<" || c === "=" || c === "?" || c === "!";
@@ -155,8 +161,23 @@
         return obj.type === "PAIR";
     };
 
+    isQuoted = function (exp) {
+        return isTaggedList(exp, quoteSymbol);
+    };
+
+    isSelfEvaluating = function (exp) {
+        return isBoolean(exp) ||
+            isFixnum(exp) ||
+            isCharacter(exp) ||
+            isString(exp);
+    };
+
     isSpace = function (c) {
         return c === " " || c === "\n" || c === "\t";
+    };
+
+    isSpecial = function (sym) {
+        return sym === quoteSymbol;
     };
 
     isString = function (obj) {
@@ -165,6 +186,17 @@
 
     isSymbol = function (obj) {
         return obj.type === "SYMBOL";
+    };
+
+    isTaggedList = function (exp, tag) {
+        var theCar;
+
+        if (isPair(exp)) {
+            theCar = car(exp);
+            return isSymbol(theCar) && theCar === tag;
+        }
+
+        return false;
     };
 
     isTheEmptyList = function (obj) {
@@ -331,6 +363,10 @@
         obj.pair.cdr = value;
     };
 
+    textOfQuotation = function (exp) {
+        return car(cdr(exp));
+    };
+
     ungetc = function (s) {
         if (s.cursor === 0) {
             return;
@@ -359,7 +395,15 @@
     };
 
     exports.eval = function (exp) {
-        return exp;
+        if (isSelfEvaluating(exp)) {
+            return exp;
+        }
+
+        if (isQuoted(exp)) {
+            return textOfQuotation(exp);
+        }
+
+        throw("cannot eval unknown expression type");
     };
 
     exports.html = function (obj) {
@@ -392,7 +436,7 @@
                 break;
 
             case "SYMBOL":
-                cls = "sym";
+                cls = isSpecial(obj) ? "special" : "sym";
 
                 break;
 
@@ -510,6 +554,10 @@
 
         if (c === "(") {
             return readPair(s);
+        }
+
+        if (c === "'") {
+            return cons(quoteSymbol, cons(exports.read(s), theEmptyList));
         }
 
         throw("bad input. Unexpected '" + c + "'");

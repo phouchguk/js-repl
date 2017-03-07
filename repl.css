@@ -29,15 +29,19 @@ div#repl .lisp-bool {
 }
 
 div#repl .lisp-char {
-    color: green;
+    color: lightGreen;
 }
 
 div#repl .lisp-nr {
-    color: blue;
+    color: lightBlue;
 }
 
 div#repl .lisp-paren {
     color: grey;
+}
+
+div#repl .lisp-prim {
+    color: yellow;
 }
 
 div#repl .lisp-special {

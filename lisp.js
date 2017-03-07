@@ -1,5 +1,5 @@
 (function (exports) {
-    var addBindingToFrame, allocObject, assignmentValue, assignmentVariable, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstFrame, frameValues, frameVariables, getc, htmlPair, ifAlternative, ifConsequent, ifPredicate, ifSymbol, init, isAlpha, isAssignment, isBoolean, isCharacter, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isIf, isInitial, isPair, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lispF, lispT, lookupVariableValue, makeCharacter, makeFixnum, makeFrame, makeSpan, makeString, makeSymbol, okSymbol, peek, peekExpectedDelimiter, quoteSymbol, readCharacter, readPair, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
+    var addBindingToFrame, allocObject, assignmentValue, assignmentVariable, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstFrame, firstOperand, frameValues, frameVariables, getc, htmlPair, ifAlternative, ifConsequent, ifPredicate, ifSymbol, init, isAlpha, isApplication, isAssignment, isBoolean, isCharacter, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isIf, isInitial, isNoOperands, isPair, isPrimitiveProc, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lispF, lispT, listOfValues, lookupVariableValue, operands, operator, makeCharacter, makeFixnum, makeFrame, makePrimitiveProc, makeSpan, makeString, makeSymbol, procAdd, okSymbol, peek, peekExpectedDelimiter, quoteSymbol, readCharacter, readPair, restOperands, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
 
     addBindingToFrame = function (variable, value, frame) {
         setCar(frame, cons(variable, car(frame)));
@@ -129,6 +129,10 @@
         return car(env);
     };
 
+    firstOperand = function (ops) {
+        return car(ops);
+    };
+
     frameValues = function (frame) {
         return cdr(frame);
     };
@@ -210,6 +214,8 @@
 
         theEmptyEnvironment = theEmptyList;
         exports.theGlobalEnvironment = setupEnvironment();
+
+        defineVariable(makeSymbol("+"), makePrimitiveProc(procAdd), exports.theGlobalEnvironment);
     };
 
     isAlpha = function (c) {
@@ -222,6 +228,10 @@
         code = c.charCodeAt(0);
 
         return (code > 96 && code < 123) || (code > 64 && code < 91);
+    };
+
+    isApplication = function (exp) {
+        return isPair(exp);
     };
 
     isAssignment = function (exp) {
@@ -270,8 +280,16 @@
             c === "<" || c === "=" || c === "?" || c === "!";
     };
 
+    isNoOperands = function (ops) {
+        return isTheEmptyList(ops);
+    };
+
     isPair = function (obj) {
         return obj.type === "PAIR";
+    };
+
+    isPrimitiveProc = function (obj) {
+        return obj.type === "PRIMITIVE_PROC";
     };
 
     isQuoted = function (exp) {
@@ -325,6 +343,15 @@
 
     isVariable = isSymbol;
 
+    listOfValues = function (exps, env) {
+        if (isNoOperands(exps)) {
+            return theEmptyList;
+        }
+
+        return cons(exports.eval(firstOperand(exps), env),
+                    listOfValues(restOperands(exps), env));
+    };
+
     lookupVariableValue = function (variable, env) {
         var frame, vars, vals;
 
@@ -376,6 +403,18 @@
         return cons(variables, values);
     };
 
+    makePrimitiveProc = function (fn) {
+        var obj;
+
+        obj = allocObject();
+        obj.type = "PRIMITIVE_PROC";
+        obj.primitiveProc = {
+            fn: fn
+        };
+
+        return obj;
+    };
+
     makeSpan = function (cls, text) {
         return "<span class=\"lisp-" + cls + "\">" + text + "</span>";
     };
@@ -410,6 +449,14 @@
         return obj;
     };
 
+    operands = function (exp) {
+        return cdr(exp);
+    };
+
+    operator = function (exp) {
+        return car(exp);
+    };
+
     peek = function (s) {
         if (s.cursor >= s.value.length) {
             return null;
@@ -422,6 +469,19 @@
         if (!isDelimiter(peek(s))) {
             throw("character not followed by delimiter");
         }
+    };
+
+    procAdd = function (args) {
+        var result;
+
+        result = 0;
+
+        while (!isTheEmptyList(args)) {
+            result = result + car(args).fixnum.value;
+            args = cdr(args);
+        }
+
+        return makeFixnum(result);
     };
 
     readCharacter = function (s) {
@@ -500,6 +560,10 @@
         return cons(carObj, cdrObj);
     };
 
+    restOperands = function (ops) {
+        return cdr(ops);
+    };
+
     setCar = function (obj, value) {
         obj.pair.car = value;
     };
@@ -571,6 +635,7 @@
     };
 
     exports.eval = function (exp, env) {
+        var args, procedure;
         while (true) {
             if (isSelfEvaluating(exp)) {
                 return exp;
@@ -600,6 +665,13 @@
                 continue;
             }
 
+            if (isApplication(exp)) {
+                procedure = exports.eval(operator(exp), env);
+                args = listOfValues(operands(exp), env);
+
+                return procedure.primitiveProc.fn(args);
+            }
+
             throw("cannot eval unknown expression type");
         }
     };
@@ -625,6 +697,13 @@
 
             case "FIXNUM":
                 cls = "nr";
+
+                break;
+
+            case "PRIMITIVE_PROC":
+                cls = "prim";
+
+                text = "#&lt;procedure&gt;";
 
                 break;
 
@@ -791,6 +870,9 @@
 
         case "PAIR":
             return "(" + writePair(obj) + ")";
+
+        case "PRIMITIVE_PROC":
+            return "#<procedure>";
 
         case "STRING":
             token = "";

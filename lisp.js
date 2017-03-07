@@ -1,5 +1,5 @@
 (function (exports) {
-    var addBindingToFrame, allocObject, assignmentValue, assignmentVariable, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstFrame, frameValues, frameVariables, getc, htmlPair, init, isAlpha, isAssignment, isBoolean, isCharacter, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isInitial, isPair, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lispF, lispT, lookupVariableValue, makeCharacter, makeFixnum, makeFrame, makeSpan, makeString, makeSymbol, okSymbol, peek, peekExpectedDelimiter, quoteSymbol, readCharacter, readPair, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
+    var addBindingToFrame, allocObject, assignmentValue, assignmentVariable, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstFrame, frameValues, frameVariables, getc, htmlPair, ifAlternative, ifConsequent, ifPredicate, ifSymbol, init, isAlpha, isAssignment, isBoolean, isCharacter, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isIf, isInitial, isPair, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lispF, lispT, lookupVariableValue, makeCharacter, makeFixnum, makeFrame, makeSpan, makeString, makeSymbol, okSymbol, peek, peekExpectedDelimiter, quoteSymbol, readCharacter, readPair, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
 
     addBindingToFrame = function (variable, value, frame) {
         setCar(frame, cons(variable, car(frame)));
@@ -168,6 +168,22 @@
         return temp + " . " + exports.html(cdrObj);
     };
 
+    ifAlternative = function (exp) {
+        if (isTheEmptyList(cdr(cdr(cdr(exp))))) {
+            return lispF;
+        }
+
+        return car(cdr(cdr(cdr(exp))));
+    };
+
+    ifConsequent = function (exp) {
+        return car(cdr(cdr(exp)));
+    };
+
+    ifPredicate = function (exp) {
+        return car(cdr(exp));
+    };
+
     init = function () {
         lispF = allocObject();
         lispF.type = "BOOLEAN";
@@ -187,6 +203,7 @@
         symbolTable = {};
 
         defineSymbol = makeSymbol("define");
+        ifSymbol = makeSymbol("if");
         okSymbol = makeSymbol("ok");
         quoteSymbol = makeSymbol("quote");
         setSymbol = makeSymbol("set!");
@@ -244,6 +261,10 @@
         return obj.type === "FIXNUM";
     };
 
+    isIf = function (exp) {
+        return isTaggedList(exp, ifSymbol);
+    };
+
     isInitial = function (c) {
         return isAlpha(c) || c === "*" || c === "/" || c === ">" ||
             c === "<" || c === "=" || c === "?" || c === "!";
@@ -270,6 +291,7 @@
 
     isSpecial = function (sym) {
         return sym === defineSymbol ||
+            sym === ifSymbol ||
             sym === quoteSymbol ||
             sym === setSymbol;
     };
@@ -549,27 +571,37 @@
     };
 
     exports.eval = function (exp, env) {
-        if (isSelfEvaluating(exp)) {
-            return exp;
-        }
+        while (true) {
+            if (isSelfEvaluating(exp)) {
+                return exp;
+            }
 
-        if (isVariable(exp)) {
-            return lookupVariableValue(exp, env);
-        }
+            if (isVariable(exp)) {
+                return lookupVariableValue(exp, env);
+            }
 
-        if (isQuoted(exp)) {
-            return textOfQuotation(exp);
-        }
+            if (isQuoted(exp)) {
+                return textOfQuotation(exp);
+            }
 
-        if (isAssignment(exp)) {
-            return evalAssignment(exp, env);
-        }
+            if (isAssignment(exp)) {
+                return evalAssignment(exp, env);
+            }
 
-        if (isDefinition(exp)) {
-            return evalDefinition(exp, env);
-        }
+            if (isDefinition(exp)) {
+                return evalDefinition(exp, env);
+            }
 
-        throw("cannot eval unknown expression type");
+            if (isIf(exp)) {
+                exp = isTrue(exports.eval(ifPredicate(exp), env)) ?
+                    ifConsequent(exp) :
+                    ifAlternative(exp);
+
+                continue;
+            }
+
+            throw("cannot eval unknown expression type");
+        }
     };
 
     exports.html = function (obj) {

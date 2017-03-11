@@ -1,5 +1,5 @@
 (function (exports) {
-    var addBindingToFrame, addProcedure, allocObject, assignmentValue, assignmentVariable, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstFrame, firstOperand, frameValues, frameVariables, getc, htmlPair, ifAlternative, ifConsequent, ifPredicate, ifSymbol, init, isAlpha, isApplication, isAssignment, isBoolean, isCharacter, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isIf, isInitial, isNoOperands, isPair, isPrimitiveProc, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lispF, lispT, listOfValues, lookupVariableValue, operands, operator, makeCharacter, makeFixnum, makeFrame, makePrimitiveProc, makeSpan, makeString, makeSymbol, okSymbol, peek, peekExpectedDelimiter, procAdd, procCar, procCdr, procCharToInteger, procCons, procIntegerToChar, procIsBoolean, procIsChar, procIsEq, procIsGreaterThan, procIsInteger, procIsLessThan, procIsNull, procIsNumberEqual, procIsPair, procIsProcedure, procIsString, procIsSymbol, procList, procMul, procNumberToString, procQuotient, procRemainder, procSetCar, procSetCdr, procStringToNumber, procStringToSymbol, procSub, procSymbolToString, quoteSymbol, readCharacter, readPair, restOperands, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
+    var addBindingToFrame, addProcedure, allocObject, assignmentValue, assignmentVariable, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstExp, firstFrame, firstOperand, frameValues, frameVariables, getc, htmlPair, ifAlternative, ifConsequent, ifPredicate, ifSymbol, init, isAlpha, isApplication, isAssignment, isBoolean, isCharacter, isCompoundProc, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isIf, isInitial, isLambda, isLastExp, isNoOperands, isPair, isPrimitiveProc, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lambdaBody, lambdaParamters, lambdaSymbol, lispF, lispT, listOfValues, lookupVariableValue, operands, operator, makeCharacter, makeCompoundProc, makeFixnum, makeFrame, makeLambda, makePrimitiveProc, makeSpan, makeString, makeSymbol, okSymbol, peek, peekExpectedDelimiter, procAdd, procCar, procCdr, procCharToInteger, procCons, procIntegerToChar, procIsBoolean, procIsChar, procIsEq, procIsGreaterThan, procIsInteger, procIsLessThan, procIsNull, procIsNumberEqual, procIsPair, procIsProcedure, procIsString, procIsSymbol, procList, procMul, procNumberToString, procQuotient, procRemainder, procSetCar, procSetCdr, procStringToNumber, procStringToSymbol, procSub, procSymbolToString, quoteSymbol, readCharacter, readPair, restExps, restOperands, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
 
     addBindingToFrame = function (variable, value, frame) {
         setCar(frame, cons(variable, car(frame)));
@@ -69,11 +69,19 @@
     };
 
     definitionValue = function (exp) {
-        return car(cdr(cdr(exp)));
+        if (isSymbol(car(cdr(exp)))) {
+            return car(cdr(cdr(exp)));
+        }
+
+        return makeLambda(cdr(car(cdr(exp))), cdr(cdr(exp)));
     };
 
     definitionVariable = function (exp) {
-        return car(cdr(exp));
+        if (isSymbol(car(cdr(exp)))) {
+            return car(cdr(exp));
+        }
+
+        return car(car(cdr(exp)));
     };
 
     eatExpectedString = function (s, str) {
@@ -129,6 +137,10 @@
 
     extendEnvironment = function (variables, values, baseEnv) {
         return cons(makeFrame(variables, values), baseEnv);
+    };
+
+    firstExp = function (seq) {
+        return car(seq);
     };
 
     firstFrame = function (env) {
@@ -214,6 +226,7 @@
 
         defineSymbol = makeSymbol("define");
         ifSymbol = makeSymbol("if");
+        lambdaSymbol = makeSymbol("lambda");
         okSymbol = makeSymbol("ok");
         quoteSymbol = makeSymbol("quote");
         setSymbol = makeSymbol("set!");
@@ -284,6 +297,10 @@
         return obj.type === "CHARACTER";
     };
 
+    isCompoundProc = function (obj) {
+        return obj.type === "COMPOUND_PROC";
+    };
+
     isDefinition = function (exp) {
         return isTaggedList(exp, defineSymbol);
     };
@@ -316,6 +333,14 @@
     isInitial = function (c) {
         return isAlpha(c) || c === "*" || c === "/" || c === ">" ||
             c === "<" || c === "=" || c === "?" || c === "!";
+    };
+
+    isLambda = function (exp) {
+        return isTaggedList(exp, lambdaSymbol);
+    };
+
+    isLastExp = function (seq) {
+        return isTheEmptyList(cdr(seq));
     };
 
     isNoOperands = function (ops) {
@@ -381,6 +406,14 @@
 
     isVariable = isSymbol;
 
+    lambdaBody = function (exp) {
+        return cdr(cdr(exp));
+    };
+
+    lambdaParamters = function (exp) {
+        return car(cdr(exp));
+    };
+
     listOfValues = function (exps, env) {
         if (isNoOperands(exps)) {
             return theEmptyList;
@@ -425,6 +458,20 @@
         return obj;
     };
 
+    makeCompoundProc = function (parameters, body, env) {
+        var obj;
+
+        obj = allocObject();
+        obj.type = "COMPOUND_PROC";
+        obj.compoundProc = {
+            parameters: parameters,
+            body: body,
+            env: env
+        };
+
+        return obj;
+    };
+
     makeFixnum = function (n) {
         var obj;
 
@@ -439,6 +486,10 @@
 
     makeFrame = function (variables, values) {
         return cons(variables, values);
+    };
+
+    makeLambda = function (parameters, body) {
+        return cons(lambdaSymbol, cons(parameters, body));
     };
 
     makePrimitiveProc = function (fn) {
@@ -792,6 +843,10 @@
         return cons(carObj, cdrObj);
     };
 
+    restExps = function (seq) {
+        return cdr(seq);
+    };
+
     restOperands = function (ops) {
         return cdr(ops);
     };
@@ -897,11 +952,37 @@
                 continue;
             }
 
+            if (isLambda(exp)) {
+                return makeCompoundProc(lambdaParamters(exp),
+                                        lambdaBody(exp),
+                                        env);
+            }
+
             if (isApplication(exp)) {
                 procedure = exports.eval(operator(exp), env);
                 args = listOfValues(operands(exp), env);
 
-                return procedure.primitiveProc.fn(args);
+                if (isPrimitiveProc(procedure)) {
+                    return procedure.primitiveProc.fn(args);
+                }
+
+                if (isCompoundProc(procedure)) {
+                    env = extendEnvironment(procedure.compoundProc.parameters,
+                                            args,
+                                            procedure.compoundProc.env);
+
+                    exp = procedure.compoundProc.body;
+
+                    while (!isLastExp(exp)) {
+                        exports.eval(firstExp(exp), env);
+                        exp = restExps(exp);
+                    }
+
+                    exp = firstExp(exp);
+                    continue;
+                }
+
+                throw("unknown procedure type");
             }
 
             throw("cannot eval unknown expression type");
@@ -1103,6 +1184,7 @@
         case "PAIR":
             return "(" + writePair(obj) + ")";
 
+        case "COMPOUND_PROC":
         case "PRIMITIVE_PROC":
             return "#<procedure>";
 

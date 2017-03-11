@@ -225,7 +225,7 @@
         addProcedure("boolean?", procIsBoolean);
         addProcedure("symbol?", procIsSymbol);
         addProcedure("integer?", procIsInteger);
-        addProcedure("char/", procIsChar);
+        addProcedure("char?", procIsChar);
         addProcedure("string?", procIsString);
         addProcedure("pair?", procIsPair);
         addProcedure("procedure?", procIsProcedure);
@@ -531,7 +531,7 @@
     };
 
     procCharToInteger = function (args) {
-        return makeFixnum(car(args).character.value);
+        return makeFixnum(car(args).character.value.charCodeAt(0));
     };
 
     procCons = function (args) {
@@ -539,7 +539,7 @@
     };
 
     procIntegerToChar = function (args) {
-        return makeCharacter(car(args).fixnum.value);
+        return makeCharacter(String.fromCharCode(car(args).fixnum.value));
     };
 
     procIsBoolean = function (args) {

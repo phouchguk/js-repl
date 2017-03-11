@@ -1,5 +1,5 @@
 (function (exports) {
-    var addBindingToFrame, addProcedure, allocObject, assignmentValue, assignmentVariable, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstExp, firstFrame, firstOperand, frameValues, frameVariables, getc, htmlPair, ifAlternative, ifConsequent, ifPredicate, ifSymbol, init, isAlpha, isApplication, isAssignment, isBoolean, isCharacter, isCompoundProc, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isIf, isInitial, isLambda, isLastExp, isNoOperands, isPair, isPrimitiveProc, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lambdaBody, lambdaParamters, lambdaSymbol, lispF, lispT, listOfValues, lookupVariableValue, operands, operator, makeCharacter, makeCompoundProc, makeFixnum, makeFrame, makeLambda, makePrimitiveProc, makeSpan, makeString, makeSymbol, okSymbol, peek, peekExpectedDelimiter, procAdd, procCar, procCdr, procCharToInteger, procCons, procIntegerToChar, procIsBoolean, procIsChar, procIsEq, procIsGreaterThan, procIsInteger, procIsLessThan, procIsNull, procIsNumberEqual, procIsPair, procIsProcedure, procIsString, procIsSymbol, procList, procMul, procNumberToString, procQuotient, procRemainder, procSetCar, procSetCdr, procStringToNumber, procStringToSymbol, procSub, procSymbolToString, quoteSymbol, readCharacter, readPair, restExps, restOperands, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
+    var addBindingToFrame, addProcedure, allocObject, assignmentValue, assignmentVariable, beginActions, beginSymbol, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstExp, firstFrame, firstOperand, frameValues, frameVariables, getc, htmlPair, ifAlternative, ifConsequent, ifPredicate, ifSymbol, init, isAlpha, isApplication, isAssignment, isBegin, isBoolean, isCharacter, isCompoundProc, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isIf, isInitial, isLambda, isLastExp, isNoOperands, isPair, isPrimitiveProc, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lambdaBody, lambdaParamters, lambdaSymbol, lispF, lispT, listOfValues, lookupVariableValue, operands, operator, makeBegin, makeCharacter, makeCompoundProc, makeFixnum, makeFrame, makeLambda, makePrimitiveProc, makeSpan, makeString, makeSymbol, okSymbol, peek, peekExpectedDelimiter, procAdd, procCar, procCdr, procCharToInteger, procCons, procIntegerToChar, procIsBoolean, procIsChar, procIsEq, procIsGreaterThan, procIsInteger, procIsLessThan, procIsNull, procIsNumberEqual, procIsPair, procIsProcedure, procIsString, procIsSymbol, procList, procMul, procNumberToString, procQuotient, procRemainder, procSetCar, procSetCdr, procStringToNumber, procStringToSymbol, procSub, procSymbolToString, quoteSymbol, readCharacter, readPair, restExps, restOperands, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
 
     addBindingToFrame = function (variable, value, frame) {
         setCar(frame, cons(variable, car(frame)));
@@ -22,6 +22,10 @@
 
     assignmentVariable = function (exp) {
         return car(cdr(exp));
+    };
+
+    beginActions = function (exp) {
+        return cdr(exp);
     };
 
     bufferMax = 1000;
@@ -224,6 +228,7 @@
 
         symbolTable = {};
 
+        beginSymbol = makeSymbol("begin");
         defineSymbol = makeSymbol("define");
         ifSymbol = makeSymbol("if");
         lambdaSymbol = makeSymbol("lambda");
@@ -287,6 +292,10 @@
 
     isAssignment = function (exp) {
         return isTaggedList(exp, setSymbol);
+    };
+
+    isBegin = function (exp) {
+        return isTaggedList(exp, beginSymbol);
     };
 
     isBoolean = function (obj) {
@@ -444,6 +453,10 @@
         }
 
         throw("unbound variable");
+    };
+
+    makeBegin = function (exp) {
+        return cons(beginSymbol, exp);
     };
 
     makeCharacter = function (c) {
@@ -958,6 +971,18 @@
                                         env);
             }
 
+            if (isBegin(exp)) {
+                exp = beginActions(exp);
+
+                while (!isLastExp(exp)) {
+                    exports.eval(firstExp(exp), env);
+                    exp = restExps(exp);
+                }
+
+                exp = firstExp(exp);
+                continue;
+            }
+
             if (isApplication(exp)) {
                 procedure = exports.eval(operator(exp), env);
                 args = listOfValues(operands(exp), env);
@@ -971,14 +996,8 @@
                                             args,
                                             procedure.compoundProc.env);
 
-                    exp = procedure.compoundProc.body;
+                    exp = makeBegin(procedure.compoundProc.body);
 
-                    while (!isLastExp(exp)) {
-                        exports.eval(firstExp(exp), env);
-                        exp = restExps(exp);
-                    }
-
-                    exp = firstExp(exp);
                     continue;
                 }
 

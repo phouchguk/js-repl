@@ -1,9 +1,15 @@
 (function (exports) {
-    var addBindingToFrame, allocObject, assignmentValue, assignmentVariable, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstFrame, firstOperand, frameValues, frameVariables, getc, htmlPair, ifAlternative, ifConsequent, ifPredicate, ifSymbol, init, isAlpha, isApplication, isAssignment, isBoolean, isCharacter, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isIf, isInitial, isNoOperands, isPair, isPrimitiveProc, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lispF, lispT, listOfValues, lookupVariableValue, operands, operator, makeCharacter, makeFixnum, makeFrame, makePrimitiveProc, makeSpan, makeString, makeSymbol, procAdd, okSymbol, peek, peekExpectedDelimiter, quoteSymbol, readCharacter, readPair, restOperands, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
+    var addBindingToFrame, addProcedure, allocObject, assignmentValue, assignmentVariable, bufferMax, car, cdr, cons, defineSymbol, defineVariable, definitionValue, definitionVariable, eatExpectedString, eatWhitespace, enclosingEnvironment, evalAssignment, evalDefinition, extendEnvironment, firstFrame, firstOperand, frameValues, frameVariables, getc, htmlPair, ifAlternative, ifConsequent, ifPredicate, ifSymbol, init, isAlpha, isApplication, isAssignment, isBoolean, isCharacter, isDefinition, isDelimiter, isDigit, isFalse, isFixnum, isIf, isInitial, isNoOperands, isPair, isPrimitiveProc, isQuoted, isSelfEvaluating, isSpace, isSpecial, isString, isSymbol, isTaggedList, isTheEmptyList, isTrue, isVariable, lispF, lispT, listOfValues, lookupVariableValue, operands, operator, makeCharacter, makeFixnum, makeFrame, makePrimitiveProc, makeSpan, makeString, makeSymbol, okSymbol, peek, peekExpectedDelimiter, procAdd, procCar, procCdr, procCharToInteger, procCons, procIntegerToChar, procIsBoolean, procIsChar, procIsEq, procIsGreaterThan, procIsInteger, procIsLessThan, procIsNull, procIsNumberEqual, procIsPair, procIsProcedure, procIsString, procIsSymbol, procList, procMul, procNumberToString, procQuotient, procRemainder, procSetCar, procSetCdr, procStringToNumber, procStringToSymbol, procSub, procSymbolToString, quoteSymbol, readCharacter, readPair, restOperands, setSymbol, setCar, setCdr, setupEnvironment, setVariableValue, symbolTable, textOfQuotation, theEmptyEnvironment, theEmptyList, ungetc, writePair;
 
     addBindingToFrame = function (variable, value, frame) {
         setCar(frame, cons(variable, car(frame)));
         setCdr(frame, cons(value, cdr(frame)));
+    };
+
+    addProcedure = function (schemeName, jsName) {
+        defineVariable(makeSymbol(schemeName),
+                      makePrimitiveProc(jsName),
+                      exports.theGlobalEnvironment);
     };
 
     allocObject = function () {
@@ -215,7 +221,39 @@
         theEmptyEnvironment = theEmptyList;
         exports.theGlobalEnvironment = setupEnvironment();
 
-        defineVariable(makeSymbol("+"), makePrimitiveProc(procAdd), exports.theGlobalEnvironment);
+        addProcedure("null?", procIsNull);
+        addProcedure("boolean?", procIsBoolean);
+        addProcedure("symbol?", procIsSymbol);
+        addProcedure("integer?", procIsInteger);
+        addProcedure("char/", procIsChar);
+        addProcedure("string?", procIsString);
+        addProcedure("pair?", procIsPair);
+        addProcedure("procedure?", procIsProcedure);
+
+        addProcedure("char->integer", procCharToInteger);
+        addProcedure("integer->char", procIntegerToChar);
+        addProcedure("number->string", procNumberToString);
+        addProcedure("string->number", procStringToNumber);
+        addProcedure("symbol->string", procSymbolToString);
+        addProcedure("string->symbol", procStringToSymbol);
+
+        addProcedure("+", procAdd);
+        addProcedure("-", procSub);
+        addProcedure("*", procMul);
+        addProcedure("quotient", procQuotient);
+        addProcedure("remainder", procRemainder);
+        addProcedure("=", procIsNumberEqual);
+        addProcedure("<", procIsLessThan);
+        addProcedure(">", procIsGreaterThan);
+
+        addProcedure("cons", procCons);
+        addProcedure("car", procCar);
+        addProcedure("cdr", procCdr);
+        addProcedure("set-car!", procSetCar);
+        addProcedure("set-cdr!", procSetCdr);
+        addProcedure("list", procList);
+
+        addProcedure("eq?", procIsEq);
     };
 
     isAlpha = function (c) {
@@ -479,6 +517,200 @@
         while (!isTheEmptyList(args)) {
             result = result + car(args).fixnum.value;
             args = cdr(args);
+        }
+
+        return makeFixnum(result);
+    };
+
+    procCar = function (args) {
+        return car(car(args));
+    };
+
+    procCdr = function (args) {
+        return cdr(car(args));
+    };
+
+    procCharToInteger = function (args) {
+        return makeFixnum(car(args).character.value);
+    };
+
+    procCons = function (args) {
+        return cons(car(args), car(cdr(args)));
+    };
+
+    procIntegerToChar = function (args) {
+        return makeCharacter(car(args).fixnum.value);
+    };
+
+    procIsBoolean = function (args) {
+        return isBoolean(car(args)) ? lispT : lispF;
+    };
+
+    procIsChar = function (args) {
+        return isCharacter(car(args)) ? lispT : lispF;
+    };
+
+    procIsEq = function (args) {
+        var obj1, obj2;
+
+        obj1 = car(args);
+        obj2 = car(cdr(args));
+
+        if (obj1.type !== obj2.type) {
+            return lispF;
+        }
+
+        switch (obj1.type) {
+            case "FIXNUM":
+            return obj1.fixnum.value === obj2.fixnum.value ? lispT : lispF;
+
+            case "CHARACTER":
+            return obj1.character.value === obj2.character.value ? lispT : lispF;
+
+            case "STRING":
+            return obj1.string.value === obj2.string.value ? lispT : lispF;
+
+            default:
+            return obj1 === obj2 ? lispT : lispF;
+        }
+    };
+
+    procIsGreaterThan = function (args) {
+        var next, previous;
+
+        previous = car(args).fixnum.value;
+
+        while (!isTheEmptyList(args = cdr(args))) {
+            next = car(args).fixnum.value;
+
+            if (previous > next) {
+                previous = next;
+            } else {
+                return lispF;
+            }
+        }
+
+        return lispT;
+    };
+
+    procIsInteger = function (args) {
+        return isFixnum(car(args)) ? lispT : lispF;
+    };
+
+    procIsNull = function (args) {
+        return isTheEmptyList(car(args)) ? lispT : lispF;
+    };
+
+    procIsLessThan = function (args) {
+        var next, previous;
+
+        previous = car(args).fixnum.value;
+
+        while (!isTheEmptyList(args = cdr(args))) {
+            next = car(args).fixnum.value;
+
+            if (previous < next) {
+                previous = next;
+            } else {
+                return lispF;
+            }
+        }
+
+        return lispT;
+    };
+
+    procIsNumberEqual = function (args) {
+        var value;
+
+        value = car(args).fixnum.value;
+
+        while (!isTheEmptyList(args = cdr(args))) {
+            if (value !== car(args).fixnum.value) {
+                return lispF;
+            }
+        }
+
+        return lispT;
+    };
+
+    procIsPair = function (args) {
+        return isPair(car(args)) ? lispT : lispF;
+    };
+
+    procIsProcedure = function (args) {
+        return isPrimitiveProc(car(args)) ? lispT : lispF;
+    };
+
+    procIsString = function (args) {
+        return isString(car(args)) ? lispT : lispF;
+    };
+
+    procIsSymbol = function (args) {
+        return isSymbol(car(args)) ? lispT : lispF;
+    };
+
+    procList = function (args) {
+        return args;
+    };
+
+    procMul = function (args) {
+        var result;
+
+        result = 1;
+
+        while (!isTheEmptyList(args)) {
+            result = result * car(args).fixnum.value;
+            args = cdr(args);
+        }
+
+        return makeFixnum(result);
+    };
+
+    procNumberToString = function (args) {
+        return makeString(car(args).fixnum.value.toString());
+    };
+
+    procQuotient = function (args) {
+        return makeFixnum(car(args).fixnum.value /
+                          car(cdr(args)).fixnum.value);
+    };
+
+    procRemainder = function (args) {
+        return makeFixnum(car(args).fixnum.value %
+                          car(cdr(args)).fixnum.value);
+    };
+
+    procSetCar = function (args) {
+        setCar(car(args), car(cdr(args)));
+
+        return okSymbol;
+    };
+
+    procSetCdr = function (args) {
+        setCdr(car(args), car(cdr(args)));
+
+        return okSymbol;
+    };
+
+    procStringToNumber = function (args) {
+        return makeFixnum(parseInt(car(args).string.value, 10));
+    };
+
+    procSymbolToString = function (args) {
+        return makeString(car(args).symbol.value);
+    };
+
+    procStringToSymbol = function (args) {
+        return makeSymbol(car(args).string.value);
+    };
+
+    procSub = function (args) {
+        var result;
+
+        result = car(args).fixnum.value;
+
+        while (!isTheEmptyList(args = cdr(args))) {
+            result = result - car(args).fixnum.value;
         }
 
         return makeFixnum(result);
